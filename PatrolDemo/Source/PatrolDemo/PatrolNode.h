@@ -9,7 +9,7 @@
 class UBillboardComponent;
 class UPatrolNodeVisualizerComponent;
 
-UCLASS(Blueprintable)
+UCLASS(NotPlaceable, Blueprintable)
 class PATROLDEMO_API APatrolNode : public AActor
 {
 	GENERATED_BODY()

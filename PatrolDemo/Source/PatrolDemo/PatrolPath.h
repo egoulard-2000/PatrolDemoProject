@@ -11,7 +11,7 @@ class UBillboardComponent;
 class UBoxComponent;
 class UPatrolPathVisualizerComponent;
 
-UCLASS()
+UCLASS(NotPlaceable, Blueprintable)
 class PATROLDEMO_API APatrolPath : public AActor
 {
 	GENERATED_BODY()
