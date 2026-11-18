@@ -107,12 +107,15 @@ bool UPatrolEdMode::PlacePatrolPoint()
         CurrentPatrolPath = GetPathActorInstance();
         check(CurrentPatrolPath);
     }
+    CurrentPatrolPath->Modify();
     CurrentPatrolPath->AddPatrolNode(SpawnedNode);
 
     // 3. Assign next node and prev node if we now have a valid path to work with
     if (ActivePatrolActorInstance)
     {
+        ActivePatrolActorInstance->Modify();
         ActivePatrolActorInstance->SetNextNode(SpawnedNode);
+        SpawnedNode->Modify();
         SpawnedNode->SetPrevNode(ActivePatrolActorInstance);
         
         // We rerun this to have the BP construction scripts re-run so the path visuals properly update
@@ -140,19 +143,19 @@ void UPatrolEdMode::FinalizePath()
     // Eliminate risk of adding a next node that won't exit
     if (ActivePatrolActorInstance)
     {
+        ActivePatrolActorInstance->Modify();
         // If proper looping path, then re-route the next node to be the first node in the path
         if (PatrolEditorSettingsObject->bPathShouldLoop && CurrentPatrolPath && CurrentPatrolPath->GetSize() >= 3)
         {
             APatrolNode* const FirstNodeInPath = CurrentPatrolPath->GetFirstNodeInPath();
             ActivePatrolActorInstance->SetNextNode(FirstNodeInPath);
+            ActivePatrolActorInstance->RerunConstructionScripts();
             if (FirstNodeInPath)
             {
+                FirstNodeInPath->Modify();
                 FirstNodeInPath->SetPrevNode(ActivePatrolActorInstance);
+                FirstNodeInPath->RerunConstructionScripts();
             }
-
-            // We rerun this to have the BP construction scripts re-run so the path visuals properly update
-            ActivePatrolActorInstance->RerunConstructionScripts();
-            FirstNodeInPath->RerunConstructionScripts();
         }
         else
         {
@@ -164,6 +167,7 @@ void UPatrolEdMode::FinalizePath()
     // Finalize Patrol Path (unless no nodes were added)
     if (CurrentPatrolPath)
     {
+        CurrentPatrolPath->Modify();
         if (CurrentPatrolPath->IsEmpty())
         {
             CurrentPatrolPath->Destroy();
@@ -199,10 +203,15 @@ APatrolNode* UPatrolEdMode::GetPatrolActorInstance()
         return nullptr;
     }
 
+    const FScopedTransaction Transaction(NSLOCTEXT("PatrolEdMode", "GetPatrolActorInstance", "Place Patrol Waypoint"));
+    FActorSpawnParameters Params;
+    Params.ObjectFlags = RF_Transactional;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
     const TSubclassOf<APatrolNode> PatrolNodeClassToSpawn = PatrolEditorSettingsObject->GetPatrolNodeClass() != nullptr ? 
         PatrolEditorSettingsObject->GetPatrolNodeClass().Get() : APatrolNode::StaticClass();
 
-    return World->SpawnActor<APatrolNode>(PatrolNodeClassToSpawn, WorldLocation, FRotator::ZeroRotator);
+    return World->SpawnActor<APatrolNode>(PatrolNodeClassToSpawn, WorldLocation, FRotator::ZeroRotator, Params);
 }
 
 APatrolPath* UPatrolEdMode::GetPathActorInstance()
@@ -216,6 +225,11 @@ APatrolPath* UPatrolEdMode::GetPathActorInstance()
         UE_LOG(LogPatrolEditorMode, Warning, TEXT("Patrol | SpawnPathActorInstance | Could not find Settings Object"));
         return nullptr;
     }
+
+    const FScopedTransaction Transaction(NSLOCTEXT("PatrolEdMode", "GetPathActorInstance", "Place Patrol Path"));
+    FActorSpawnParameters Params;
+    Params.ObjectFlags = RF_Transactional;
+    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
     const TSubclassOf<APatrolPath> PatrolPathClassToSpawn = PatrolEditorSettingsObject->GetPatrolPathClass() != nullptr ?
         PatrolEditorSettingsObject->GetPatrolPathClass().Get() : APatrolPath::StaticClass();
